@@ -8,11 +8,13 @@ NOTE: In windows, use %run rather than execute
 
 
 from pathlib import Path
+import cv2
 import numpy as np
 from tqdm import tqdm
-import staintools
+#import staintools
 from PIL import Image
 from joblib import Parallel, delayed
+import tiatoolbox.tools.stainnorm as snorm
 import extractors
 class CPRInfo:
     def __init__(self,slide_path,output,cp,ext,N):
@@ -61,8 +63,11 @@ class CPathReader:
         self.kwargs = kwargs        
         self.stain_method = stain_method
         self.stain_target = stain_target
-        self.snormalizer = staintools.StainNormalizer(method=stain_method)  # "macenko" is much faster
-        self.snormalizer.fit(staintools.read_image(stain_target))
+        self.snormalizer = snorm.get_normaliser(stain_method)  # "macenko" is much faster
+        target_image_path='D:\Meso\TMA_stain_target.tiff'
+        target_image = cv2.imread(target_image_path)
+        target_image = cv2.cvtColor(target_image, cv2.COLOR_BGR2RGB)
+        self.snormalizer.fit(target_image)
     def WSI2Thumb(self,slide_path,mpp=8):  
         from segmenters import MultiThresholdSegmenter
         from openslide import OpenSlide
@@ -192,7 +197,8 @@ class CPathReader:
             plist = glob(plist)
         odir = Path(odir)
         def writout(f):            
-            patch = staintools.read_image(f)
+            patch = cv2.imread(f)
+            patch = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
             f = Path(f)
             patch = self.stainNormalizePatch(patch)
             patch.save(odir / f.name)
