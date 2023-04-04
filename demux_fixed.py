@@ -14,10 +14,10 @@ from tiatoolbox.wsicore.wsireader import WSIReader
 import cv2
 from pathlib import Path
 import matplotlib.pyplot as plt
-vipshome = r'C:\Users\meast\vips-dev-8.12\bin'
+# vipshome = r'C:\Users\meast\vips-dev-8.12\bin'
 import os
-os.environ['PATH'] = vipshome + ';' + os.environ['PATH']
-#import pyvips as vips
+# os.environ['PATH'] = vipshome + ';' + os.environ['PATH']
+import pyvips as vips
 
 def get_luminosity_tissue_mask(img, threshold):
     """Get tissue mask based on the luminosity of the input image.
@@ -245,12 +245,14 @@ class VirtualRestainer:
     extent to which two stains bind to the same tissue components. Uses histogram matching
     and these coupling matrices to virtually restain the image.
     """
-    def __init__(self, img=None, coupling_coeffs={"wdh":0.7, "wde":0.2, "weh":0.2, "wed":0.5}, patch_size=2048, stride=2048, stain_extractor=VahadaneExtractor3d(), load_path=None, stains="HE"):
+    def __init__(self, img=None, coupling_coeffs={"wdh":0.7, "wde":0.2, "weh":0.2, "wed":0.5}, patch_size=4096, stride=4096, stain_extractor=VahadaneExtractor3d(), load_path=None, stains="HE"):
         self.img = img
         self.coupling_coeffs = coupling_coeffs
         self.stain_extractor = stain_extractor
         self.stains = stains
         self.patch_extractor = None
+        self.patch_size = patch_size
+        self.stride = stride
         if img:
             self.patch_extractor = SlidingWindowPatchExtractor(
                 input_img=self.img,
@@ -258,13 +260,17 @@ class VirtualRestainer:
                 stride=(stride, stride),
                 input_mask='otsu', #'morphological',
                 min_mask_ratio=0.75,
+                within_bound=True,
             )
         # default stain mat and inverse
         # self.stain_mat = np.array([[0.458,0.814,0.356],[0.259,0.866,0.428],[0.269,0.568,0.778]])
         
-        self.stain_mat = np.array([[0.65, 0.70, 0.29],
-                          [0.07, 0.99, 0.11],
-                          [0.27, 0.57, 0.78]])
+        # self.stain_mat = np.array([[0.65, 0.70, 0.29],
+        #                   [0.07, 0.99, 0.11],
+        #                   [0.27, 0.57, 0.78]])
+        self.stain_mat = np.array([[0.590, 0.73, 0.35],  #PHH3
+                          [0.19, 0.9, 0.41],
+                          [0.5, 0.615, 0.6]])
         self.stain_mat_inv = np.linalg.inv(self.stain_mat)
         if load_path is not None:
             # load learned matchers, sm, etc from file
@@ -394,7 +400,7 @@ class VirtualRestainer:
         self.H2D = GlobalHistMatcher().fit(nh,bins,nd,bins)
 
     def __call__(self, tile):
-        return self.restain_tile(tile, stains=self.stains, sigma=5, naive=True)
+        return self.restain_tile(tile, stains=self.stains, sigma=5, naive=False)
 
     def restain_tile(self, tile, sigma=5.0, stains='HE', lum_norm=False, naive=False):
         """Restain a tile of the input image. The tile is transformed into HED space and
@@ -443,13 +449,13 @@ class VirtualRestainer:
                                 in_range=self.drange)
 
             if sigma>0:
-                h1 = gaussian_filter(h, sigma=sigma)
-                e1 = gaussian_filter(e, sigma=sigma)
-                d1 = gaussian_filter(d, sigma=sigma)
+                h1 = gaussian_filter(h, sigma=sigma)[tissue_mask]
+                e1 = gaussian_filter(e, sigma=sigma)[tissue_mask]
+                d1 = gaussian_filter(d, sigma=sigma)[tissue_mask]
             else:
-                h1=h
-                e1=e
-                d1=d
+                h1=h[tissue_mask]
+                e1=e[tissue_mask]
+                d1=d[tissue_mask]
 
         d0 = d0[tissue_mask]
         h0 = h0[tissue_mask]
@@ -462,8 +468,14 @@ class VirtualRestainer:
             else:
                 d2h = self.D2H.transform(d0)
                 d2e = self.D2E.transform(d0)
-                hrec = (h0+wdh*h1[tissue_mask]*d2h)/(1+wdh)#(h0+wh*h1*d0)/(1+wh)
-                erec = (e0+wde*e1[tissue_mask]*d2e)/(1+wde)#(e0+we*e1*d0)/(1+we)
+                # hrec = (h0+wdh*h1[tissue_mask]*d2h)/(1+wdh)#(h0+wh*h1*d0)/(1+wh)
+                # erec = (e0+wde*e1[tissue_mask]*d2e)/(1+wde)#(e0+we*e1*d0)/(1+we)
+
+                smask_h = h1 + wdh * 1.5 * (np.abs(d1- np.percentile(d1, 60)))
+                smask_e = e1 + wde * 1.5 * (np.abs(d1- np.percentile(d1, 60)))
+
+                hrec = (h0+wdh*smask_h*d2h)#/(1+wdh)#(h0+wh*h1*d0)/(1+wh)
+                erec = (e0+wde*smask_e*d2e)#/(1+wde)#(e0+we*e1*d0)/(1+we)
                 # hrec = gaussian_filter(hrec, sigma=1.0)
                 # erec = gaussian_filter(erec, sigma=1.0)
                 rec = self.combine_stains(np.stack((hrec, erec, blank), axis=-1), self.stain_mat)
@@ -474,8 +486,14 @@ class VirtualRestainer:
             else:
                 e2h = self.E2H.transform(e0)
                 e2d = self.E2D.transform(e0)
-                hrec = (h0+weh*h1[tissue_mask]*e2h)/(1+weh)
-                drec = (d0+wed*d1[tissue_mask]*e2d)/(1+wed)
+                # hrec = (h0+weh*h1[tissue_mask]*e2h)/(1+weh)
+                # drec = (d0+wed*d1[tissue_mask]*e2d)/(1+wed)
+
+                smask_h = h1 + weh * 1.5 * (np.abs(e1- np.percentile(e1, 60)))
+                smask_d = d1 + wed * 1.5 * (np.abs(e1- np.percentile(e1, 60)))
+
+                hrec = (h0+weh*smask_h*e2h)#/(1+weh)
+                drec = (d0+wed*smask_d*e2d)#/(1+wed)
                 rec = self.combine_stains(np.stack((hrec, blank, drec), axis=-1), self.stain_mat)
         elif stains=='D':
             # experimental
@@ -511,66 +529,87 @@ class VirtualRestainer:
         self.E2D = GlobalHistMatcher(*matcher_stats["E2D"])
         self.E2H = GlobalHistMatcher(*matcher_stats["E2H"])
 
-    def save_restained_WSI(self, filename, sigma=5.0, stains='HE', lum_norm=False):
+    def save_restained_WSI(self, filename, sigma=5.0, stains=['HE'], lum_norm=False):
         """Restain the whole slide image patch by patch, assemble the whole slide image 
         on disk as it is too large to fit in memory, and use pyvips to save the image
         as a pyramidal .tiff file."""
-        tmp_path = filename.parent / (filename.stem + '_tmp.npy')
-        wsi = WSIReader.open(self.img)
-        canvas_shape = wsi.info.slide_dimensions
-        out_ch = 3
-        self.patch_extractor.min_mask_ratio = 0 # do not discard patches with low tissue content
+        filename = Path(filename)
+        for stain in stains:
+            tmp_path = filename.parent / (filename.stem + '_tmp_.npy')
+            wsi = WSIReader.open(self.img)
+            canvas_shape = wsi.info.slide_dimensions[::-1]
+            mpp = wsi.info.mpp
+            out_ch = 3
+            self.patch_extractor = SlidingWindowPatchExtractor(
+                input_img=self.img,
+                patch_size=(self.patch_size, self.patch_size),
+                stride=(self.stride, self.stride),
+                input_mask='otsu', #'morphological',
+                min_mask_ratio=0.1, # only discard patches with very low tissue content
+                within_bound=True,
+            ) 
 
-        locs = self.patch_extractor.coordinate_list[:, :2]
+            locs = self.patch_extractor.coordinate_list[:, :2]
 
-        cum_canvas = np.lib.format.open_memmap(
-            tmp_path,
-            mode="w+",
-            shape=tuple(canvas_shape) + (out_ch,),
-            dtype=np.uint8,
-        )
+            cum_canvas = np.lib.format.open_memmap(
+                tmp_path,
+                mode="w+",
+                shape=tuple(canvas_shape) + (out_ch,),
+                dtype=np.uint8,
+            )
+            cum_canvas[:] = 240
 
-        for i, tile in tqdm(enumerate(self.patch_extractor), total=len(self.patch_extractor)):
-            rec = self.restain_tile(tile, sigma=sigma, stains=stains, lum_norm=lum_norm)
-            x, y = locs[i]
-            cum_canvas[x:x + self.patch_size, y:y + self.patch_size, :] = rec
+            for i, tile in tqdm(enumerate(self.patch_extractor), total=len(self.patch_extractor)):
+                rec = self.restain_tile(tile, sigma=sigma, stains=stain, lum_norm=lum_norm)
+                x, y = locs[i]
+                if y+rec.shape[0] > canvas_shape[0] or x+rec.shape[1] > canvas_shape[1]:
+                    print("meep")
+                cum_canvas[y:y + self.patch_size, x:x + self.patch_size, :] = rec
 
-        # make a vips image and save it as a pyramidal tiff
-        vips_img = vips.Image.new_from_memory(
-            cum_canvas.tobytes(),
-            canvas_shape[1],
-            canvas_shape[0],
-            out_ch,
-            "uchar"
-        )
-        vips_img.tiffsave(filename, tile=True, pyramid=True, compression="jpeg", Q=90, bigtiff=True)
-        # close memmap and clean up
-        cum_canvas._mmap.close()
-        del cum_canvas
-        os.remove(tmp_path)
+            # make a vips image and save it as a pyramidal tiff
+            #height, width, bands = cum_canvas.shape
+            #linear = cum_canvas.reshape(width * height * bands)
+            vips_img = vips.Image.new_from_memory(
+                cum_canvas.tobytes(),
+                canvas_shape[1],
+                canvas_shape[0],
+                out_ch,
+                "uchar"
+            )
+            # set resolution metadata - tiffsave expects res in pixels per mm regardless of resunit
+            vips_img.tiffsave(filename.with_stem(filename.stem + f"_{stain}"), tile=True, pyramid=True, compression="jpeg", Q=85, bigtiff=True, xres=1000/mpp[0], yres=1000/mpp[1], resunit="cm", tile_width=512, tile_height=512)
+            # close memmap and clean up
+            cum_canvas._mmap.close()
+            del cum_canvas
+            os.remove(tmp_path)
 
 if __name__ == '__main__':
-    slides_path = Path(r"E:\PRISMATIC\Mitosis_Ki67_IHC_and_IHC+HE_Trial_Asmaa")
-    slides = list(slides_path.glob('*.mrxs'))
-    for slide in slides:
-        if "only" in slide.stem:
+    slides_path = Path(r"/media/u2071810/Data/Multiplexstaining/Asmaa Multiplex Staining")
+    slides = list(slides_path.glob('*PHH3_HE.svs'))
+    for slide in slides[:5]:
+        if "only" in slide.stem or (slide.parent / (slide.stem + '_info3.pkl')).exists():
             continue
-        restainer = VirtualRestainer(slide)
-        #restainer.get_stain_matrix(n_jobs=1)
-        restainer.get_histogram_matchers(n_jobs=1)
-        restainer.save_info(slide.parent / (slide.stem + '_info_.pkl'))
-        # restain a few patches to check the results
-        for i, patch in enumerate(restainer.patch_extractor):
-            rec = restainer.restain_tile(patch, sigma=5.0, stains='HD', lum_norm=False)
-            naive_rec = restainer.restain_tile(patch, sigma=5.0, stains='HD', lum_norm=False, naive=True)
-            # plot patch and both reconstructed patches side by side
-            fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-            ax[0].imshow(patch)
-            ax[1].imshow(rec)
-            ax[2].imshow(naive_rec)
-            plt.show()
-            if i == 5:
-                break
+        try:
+            restainer = VirtualRestainer(slide)
+            #restainer.get_stain_matrix(n_jobs=1)
+            restainer.get_histogram_matchers(n_jobs=4)
+            restainer.save_info(slide.parent / (slide.stem + '_info3.pkl'))
+        except:
+            print(f"Failed to restain {slide.stem}")
+            continue
+        if False:
+            # restain a few patches to check the results
+            for i, patch in enumerate(restainer.patch_extractor):
+                rec = restainer.restain_tile(patch, sigma=5.0, stains='HD', lum_norm=False)
+                naive_rec = restainer.restain_tile(patch, sigma=5.0, stains='HD', lum_norm=False, naive=True)
+                # plot patch and both reconstructed patches side by side
+                fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+                ax[0].imshow(patch)
+                ax[1].imshow(rec)
+                ax[2].imshow(naive_rec)
+                plt.show()
+                if i == 5:
+                    break
 
 
 
