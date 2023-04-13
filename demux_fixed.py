@@ -268,9 +268,12 @@ class VirtualRestainer:
         # self.stain_mat = np.array([[0.65, 0.70, 0.29],
         #                   [0.07, 0.99, 0.11],
         #                   [0.27, 0.57, 0.78]])
-        self.stain_mat = np.array([[0.590, 0.73, 0.35],  #PHH3
-                          [0.19, 0.9, 0.41],
-                          [0.5, 0.615, 0.6]])
+        # self.stain_mat = np.array([[0.590, 0.73, 0.35],  #PHH3, Qupath
+        #                   [0.19, 0.9, 0.41],
+        #                   [0.5, 0.615, 0.6]])
+        self.stain_mat = np.array([[0.5207, 0.7412, 0.3322],
+                            [0.1816, 0.9181, 0.4228],
+                            [0.2083, 0.5305, 0.8307]])  #PHH3 stain learner
         self.stain_mat_inv = np.linalg.inv(self.stain_mat)
         if load_path is not None:
             # load learned matchers, sm, etc from file
@@ -474,8 +477,8 @@ class VirtualRestainer:
                 smask_h = h1 + wdh * 1.5 * (np.abs(d1- np.percentile(d1, 60)))
                 smask_e = e1 + wde * 1.5 * (np.abs(d1- np.percentile(d1, 60)))
 
-                hrec = (h0+wdh*smask_h*d2h)#/(1+wdh)#(h0+wh*h1*d0)/(1+wh)
-                erec = (e0+wde*smask_e*d2e)#/(1+wde)#(e0+we*e1*d0)/(1+we)
+                hrec = np.clip((h0+wdh*smask_h*d2h), 0, 1)#/(1+wdh)#(h0+wh*h1*d0)/(1+wh)
+                erec = np.clip((e0+wde*smask_e*d2e), 0, 1)#/(1+wde)#(e0+we*e1*d0)/(1+we)
                 # hrec = gaussian_filter(hrec, sigma=1.0)
                 # erec = gaussian_filter(erec, sigma=1.0)
                 rec = self.combine_stains(np.stack((hrec, erec, blank), axis=-1), self.stain_mat)
@@ -492,8 +495,8 @@ class VirtualRestainer:
                 smask_h = h1 + weh * 1.5 * (np.abs(e1- np.percentile(e1, 60)))
                 smask_d = d1 + wed * 1.5 * (np.abs(e1- np.percentile(e1, 60)))
 
-                hrec = (h0+weh*smask_h*e2h)#/(1+weh)
-                drec = (d0+wed*smask_d*e2d)#/(1+wed)
+                hrec = np.clip((h0+weh*smask_h*e2h), 0, 1)#/(1+weh)
+                drec = np.clip((d0+wed*smask_d*e2d), 0, 1)#/(1+wed)
                 rec = self.combine_stains(np.stack((hrec, blank, drec), axis=-1), self.stain_mat)
         elif stains=='D':
             # experimental

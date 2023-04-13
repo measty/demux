@@ -15,7 +15,7 @@ mask_folder = None #Path(r"/media/u2071810/Data/ABCTB/histoqc_output_may_2022")
 save_dir = Path(r"/home/u2071810/Data/Demux/overlays/")
 tmp_save_dir = str(save_dir / "tmp")
 doing_now = save_dir / "current_files.pkl"
-filter_str = '*restained2_HE.tiff'
+filter_str = '*restained6_HE.tiff'
 
 if __name__=='__main__':
     if not save_dir.exists():

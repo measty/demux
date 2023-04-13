@@ -9,13 +9,13 @@ stains = ["HE","HD"]
 for slide in slides[:5]:
     print(f"Restaining {slide}")
     restainer = VirtualRestainer(slide, coupling_coeffs={"wdh":0.8, "wde":0.1, "weh":0.1, "wed":0.1})
-    info_path = slide.parent / (slide.stem + "_info2.pkl")
+    info_path = slide.parent / (slide.stem + "_info3.pkl")
     try:
         restainer.load_info(info_path)
     except:
         print("No info file found")
         continue
-    if not (slide.parent / (slide.stem + "_restained5_HE.tiff")).exists():
-        restainer.save_restained_WSI(slide.parent / (slide.stem + "_restained5.tiff"), stains=stains, lum_norm=False)
+    if not (slide.parent / (slide.stem + "_restained6_HE.tiff")).exists():
+        restainer.save_restained_WSI(slide.parent / (slide.stem + "_restained6.tiff"), stains=stains, lum_norm=False)
 
 print("Done")
