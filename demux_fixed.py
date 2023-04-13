@@ -474,11 +474,14 @@ class VirtualRestainer:
                 # hrec = (h0+wdh*h1[tissue_mask]*d2h)/(1+wdh)#(h0+wh*h1*d0)/(1+wh)
                 # erec = (e0+wde*e1[tissue_mask]*d2e)/(1+wde)#(e0+we*e1*d0)/(1+we)
 
-                smask_h = h1 + wdh * 1.5 * (np.abs(d1- np.percentile(d1, 60)))
-                smask_e = e1 + wde * 1.5 * (np.abs(d1- np.percentile(d1, 60)))
+                #smask_h = h1 + wdh * 1.5 * (np.abs(d1- np.percentile(d1, 60)))
+                #smask_e = e1 + wde * 1.5 * (np.abs(d1- np.percentile(d1, 60)))
 
-                hrec = np.clip((h0+wdh*smask_h*d2h), 0, 1)#/(1+wdh)#(h0+wh*h1*d0)/(1+wh)
-                erec = np.clip((e0+wde*smask_e*d2e), 0, 1)#/(1+wde)#(e0+we*e1*d0)/(1+we)
+                hrec = np.clip(h0 + wdh * 1.5 * (np.abs(d2h- np.percentile(d2h, 60))), 0, 1)
+                erec = np.clip(e0 + wde * 1.5 * (np.abs(d2e- np.percentile(d2e, 60))), 0, 1)
+
+                #hrec = np.clip((h0+wdh*smask_h*d2h), 0, 1)#/(1+wdh)#(h0+wh*h1*d0)/(1+wh)
+                #erec = np.clip((e0+wde*smask_e*d2e), 0, 1)#/(1+wde)#(e0+we*e1*d0)/(1+we)
                 # hrec = gaussian_filter(hrec, sigma=1.0)
                 # erec = gaussian_filter(erec, sigma=1.0)
                 rec = self.combine_stains(np.stack((hrec, erec, blank), axis=-1), self.stain_mat)
@@ -492,11 +495,14 @@ class VirtualRestainer:
                 # hrec = (h0+weh*h1[tissue_mask]*e2h)/(1+weh)
                 # drec = (d0+wed*d1[tissue_mask]*e2d)/(1+wed)
 
-                smask_h = h1 + weh * 1.5 * (np.abs(e1- np.percentile(e1, 60)))
-                smask_d = d1 + wed * 1.5 * (np.abs(e1- np.percentile(e1, 60)))
+                #smask_h = h1 + weh * 1.5 * (np.abs(e1- np.percentile(e1, 60)))
+                #smask_d = d1 + wed * 1.5 * (np.abs(e1- np.percentile(e1, 60)))
 
-                hrec = np.clip((h0+weh*smask_h*e2h), 0, 1)#/(1+weh)
-                drec = np.clip((d0+wed*smask_d*e2d), 0, 1)#/(1+wed)
+                hrec = np.clip(h0 + weh * 1.5 * (np.abs(e2h- np.percentile(e2h, 60))), 0, 1)
+                drec = np.clip(d0 + wed * 1.5 * (np.abs(e2d- np.percentile(e2d, 60))), 0, 1)
+
+                #hrec = np.clip((h0+weh*smask_h*e2h), 0, 1)#/(1+weh)
+                #drec = np.clip((d0+wed*smask_d*e2d), 0, 1)#/(1+wed)
                 rec = self.combine_stains(np.stack((hrec, blank, drec), axis=-1), self.stain_mat)
         elif stains=='D':
             # experimental
