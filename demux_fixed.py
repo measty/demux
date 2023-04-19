@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import os
 # os.environ['PATH'] = vipshome + ';' + os.environ['PATH']
 import pyvips as vips
+from PIL import Image
 
 def get_luminosity_tissue_mask(img, threshold):
     """Get tissue mask based on the luminosity of the input image.
@@ -267,13 +268,17 @@ class VirtualRestainer:
         
         # self.stain_mat = np.array([[0.65, 0.70, 0.29],
         #                   [0.07, 0.99, 0.11],
-        #                   [0.27, 0.57, 0.78]])
-        # self.stain_mat = np.array([[0.590, 0.73, 0.35],  #PHH3, Qupath
-        #                   [0.19, 0.9, 0.41],
-        #                   [0.5, 0.615, 0.6]])
-        self.stain_mat = np.array([[0.5207, 0.7412, 0.3322],
-                            [0.1816, 0.9181, 0.4228],
-                            [0.2083, 0.5305, 0.8307]])  #PHH3 stain learner
+        #                   [0.27, 0.57, 0.78]])     #sklearn
+        self.stain_mat = np.array([[0.590, 0.73, 0.35],  #PHH3, Qupath
+                          [0.19, 0.9, 0.41],
+                          [0.5, 0.615, 0.6]])
+        # self.stain_mat = np.array([[0.5207, 0.7412, 0.3322],
+        #                     [0.1816, 0.9181, 0.4228],
+        #                     [0.2083, 0.5305, 0.8307]])  #PHH3 stain learner
+        # self.stain_mat = np.array([[0.65, 0.70, 0.29],
+        #                    [0.17, 0.9, 0.23],
+        #                    [0.27, 0.57, 0.78]])    # hybrid, E from Qpath, HD from 'ideal'
+        
         self.stain_mat_inv = np.linalg.inv(self.stain_mat)
         if load_path is not None:
             # load learned matchers, sm, etc from file
@@ -452,9 +457,9 @@ class VirtualRestainer:
                                 in_range=self.drange)
 
             if sigma>0:
-                h1 = gaussian_filter(h, sigma=sigma)[tissue_mask]
-                e1 = gaussian_filter(e, sigma=sigma)[tissue_mask]
-                d1 = gaussian_filter(d, sigma=sigma)[tissue_mask]
+                h1 = gaussian_filter(h0, sigma=sigma)[tissue_mask]
+                e1 = gaussian_filter(e0, sigma=sigma)[tissue_mask]
+                d1 = gaussian_filter(d0, sigma=sigma)[tissue_mask]
             else:
                 h1=h[tissue_mask]
                 e1=e[tissue_mask]
@@ -471,17 +476,22 @@ class VirtualRestainer:
             else:
                 d2h = self.D2H.transform(d0)
                 d2e = self.D2E.transform(d0)
-                # hrec = (h0+wdh*h1[tissue_mask]*d2h)/(1+wdh)#(h0+wh*h1*d0)/(1+wh)
-                # erec = (e0+wde*e1[tissue_mask]*d2e)/(1+wde)#(e0+we*e1*d0)/(1+we)
+                hrec = (h0+wdh*h1*d2h)/(1+wdh)#(h0+wh*h1*d0)/(1+wh)
+                erec = (e0+wde*e1*d2e)/(1+wde)#(e0+we*e1*d0)/(1+we)
 
-                #smask_h = h1 + wdh * 1.5 * (np.abs(d1- np.percentile(d1, 60)))
-                #smask_e = e1 + wde * 1.5 * (np.abs(d1- np.percentile(d1, 60)))
+                # smask_h = h1 + wdh * 1.5 * (np.clip(d2h- np.percentile(d2h, 80), 0, 10))
+                # smask_e = e1 + wde * 1.5 * (np.clip(d2e- np.percentile(d2e, 80), 0, 10))
 
-                hrec = np.clip(h0 + wdh * 1.5 * (np.abs(d2h- np.percentile(d2h, 60))), 0, 1)
-                erec = np.clip(e0 + wde * 1.5 * (np.abs(d2e- np.percentile(d2e, 60))), 0, 1)
+                # smask_h = rescale_intensity(smask_h, out_range=(0, 1),
+                #                 in_range=self.hrange)
+                # smask_e = rescale_intensity(smask_e, out_range=(0, 1),
+                #                 in_range=self.erange)
 
-                #hrec = np.clip((h0+wdh*smask_h*d2h), 0, 1)#/(1+wdh)#(h0+wh*h1*d0)/(1+wh)
-                #erec = np.clip((e0+wde*smask_e*d2e), 0, 1)#/(1+wde)#(e0+we*e1*d0)/(1+we)
+                #hrec = np.clip(h0 + wdh * 1.5 * (np.clip(d2h- np.percentile(d2h, 90), 0, 10)), 0, 1)
+                #erec = np.clip(e0 + wde * 1.5 * (np.clip(d2e- np.percentile(d2e, 90), 0 , 10)), 0, 1)
+
+                # hrec = np.clip((h0+wdh*smask_h*d2h), 0, 1)/(1+wdh)#(h0+wh*h1*d0)/(1+wh)
+                # erec = np.clip((e0+wde*smask_e*d2e), 0, 1)/(1+wde)#(e0+we*e1*d0)/(1+we)
                 # hrec = gaussian_filter(hrec, sigma=1.0)
                 # erec = gaussian_filter(erec, sigma=1.0)
                 rec = self.combine_stains(np.stack((hrec, erec, blank), axis=-1), self.stain_mat)
@@ -492,17 +502,22 @@ class VirtualRestainer:
             else:
                 e2h = self.E2H.transform(e0)
                 e2d = self.E2D.transform(e0)
-                # hrec = (h0+weh*h1[tissue_mask]*e2h)/(1+weh)
-                # drec = (d0+wed*d1[tissue_mask]*e2d)/(1+wed)
+                hrec = (h0+weh*h1*e2h)/(1+weh)
+                drec = (d0+wed*d1*e2d)/(1+wed)
 
-                #smask_h = h1 + weh * 1.5 * (np.abs(e1- np.percentile(e1, 60)))
-                #smask_d = d1 + wed * 1.5 * (np.abs(e1- np.percentile(e1, 60)))
+                # smask_h = h1 + weh * 1.5 * (np.clip(e2h- np.percentile(e2h, 80), 0, 10))
+                # smask_d = d1 + wed * 1.5 * (np.clip(e2d- np.percentile(e2d, 80), 0, 10))
 
-                hrec = np.clip(h0 + weh * 1.5 * (np.abs(e2h- np.percentile(e2h, 60))), 0, 1)
-                drec = np.clip(d0 + wed * 1.5 * (np.abs(e2d- np.percentile(e2d, 60))), 0, 1)
+                # smask_h = rescale_intensity(smask_h, out_range=(0, 1),
+                #                 in_range=self.hrange)
+                # smask_d = rescale_intensity(smask_d, out_range=(0, 1),
+                #                 in_range=self.drange)
 
-                #hrec = np.clip((h0+weh*smask_h*e2h), 0, 1)#/(1+weh)
-                #drec = np.clip((d0+wed*smask_d*e2d), 0, 1)#/(1+wed)
+                #hrec = np.clip(h0 + weh * 1.5 * (np.clip(e2h- np.percentile(e2h, 90), 0, 10)), 0, 1)
+                #drec = np.clip(d0 + wed * 1.5 * (np.clip(e2d- np.percentile(e2d, 90), 0, 10)), 0, 1)
+
+                # hrec = np.clip((h0+weh*smask_h*e2h), 0, 1)/(1+weh)
+                # drec = np.clip((d0+wed*smask_d*e2d), 0, 1)/(1+wed)
                 rec = self.combine_stains(np.stack((hrec, blank, drec), axis=-1), self.stain_mat)
         elif stains=='D':
             # experimental
@@ -592,17 +607,45 @@ class VirtualRestainer:
             del cum_canvas
             os.remove(tmp_path)
 
+    def save_sample_tiles(self, save_path, tile_size=None, n_tiles=10, sigma=5.0, stains=['HE'], lum_norm=False):
+        """Restain a random sampling of restained tiles, and save them as .png files."""
+        if tile_size is not None:
+            self.patch_size = tile_size
+            self.stride = tile_size
+            self.patch_extractor = SlidingWindowPatchExtractor(
+                input_img=self.img,
+                patch_size=(self.patch_size, self.patch_size),
+                stride=(self.stride, self.stride),
+                input_mask='otsu', #'morphological',
+                min_mask_ratio=0.8, # prefer patches with high tissue content
+                within_bound=True,
+            ) 
+
+        save_path = Path(save_path)
+        save_path.mkdir(exist_ok=True)
+        sample_inds = np.random.choice(len(self.patch_extractor), n_tiles, replace=False)
+        for ind in tqdm(sample_inds):
+            tile = self.patch_extractor[int(ind)]
+            for stain in stains:
+                rec = self.restain_tile(tile, sigma=sigma, stains=stain, lum_norm=lum_norm)
+                rec = Image.fromarray(rec)
+                rec.save(save_path / f"{ind}_{stain}.png")
+            
+
+
+
+
 if __name__ == '__main__':
     slides_path = Path(r"/media/u2071810/Data/Multiplexstaining/Asmaa Multiplex Staining")
     slides = list(slides_path.glob('*PHH3_HE.svs'))
     for slide in slides[:5]:
-        if "only" in slide.stem or (slide.parent / (slide.stem + '_info3.pkl')).exists():
+        if "only" in slide.stem or (slide.parent / (slide.stem + '_info_qpath.pkl')).exists():
             continue
         try:
             restainer = VirtualRestainer(slide)
             #restainer.get_stain_matrix(n_jobs=1)
             restainer.get_histogram_matchers(n_jobs=4)
-            restainer.save_info(slide.parent / (slide.stem + '_info3.pkl'))
+            restainer.save_info(slide.parent / (slide.stem + '_info_qpath.pkl'))
         except:
             print(f"Failed to restain {slide.stem}")
             continue

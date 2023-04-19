@@ -10,12 +10,16 @@ from pathlib import Path
 from shutil import rmtree
 import pickle
 
-wsi_folder = Path(r"/media/u2071810/Data/Multiplexstaining/Asmaa Multiplex Staining/")
+#wsi_folder = Path(r"/media/u2071810/Data/Multiplexstaining/Asmaa Multiplex Staining/")
+wsi_folder = Path(r"/media/u2071810/Data/Multiplexstaining/Asmaa Multiplex Staining/tiles_qpath")
 mask_folder = None #Path(r"/media/u2071810/Data/ABCTB/histoqc_output_may_2022")
-save_dir = Path(r"/home/u2071810/Data/Demux/overlays/")
+#save_dir = Path(r"/home/u2071810/Data/Demux/overlays/")
+save_dir = wsi_folder
 tmp_save_dir = str(save_dir / "tmp")
 doing_now = save_dir / "current_files.pkl"
-filter_str = '*restained6_HE.tiff'
+#filter_str = '*restained6_HE.tiff'
+filter_str = '*.png'
+mode = 'tile' # 'wsi' or 'tile'
 
 if __name__=='__main__':
     if not save_dir.exists():
@@ -32,7 +36,8 @@ if __name__=='__main__':
             doing_files = []
     else:
         doing_files = []
-    doing_files = []
+    doing_files = [] #force it to do all the files, remove if another run
+    # is in progress
     skip_files = doing_files + done_files
     number_to_do = 50
     slide_list = list(wsi_folder.glob(filter_str))
@@ -81,7 +86,7 @@ if __name__=='__main__':
                 [slide_path],
                 masks=[mask_path],
                 save_dir=tmp_save_dir,
-                mode="wsi",
+                mode=mode,
                 on_gpu=True,
                 crash_on_exception=True,
             )
