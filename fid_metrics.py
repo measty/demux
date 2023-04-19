@@ -1,4 +1,5 @@
 from pytorch_fid.fid_score import *
+import argparse
 
 
 def get_activations_wsi(wsi_folder_ds, model, batch_size=50, dims=2048, device='cpu',
@@ -118,3 +119,25 @@ def calculate_fid_given_wsi_paths(paths, batch_size, device, dims, num_workers=1
     fid_value = calculate_frechet_distance(m1, s1, m2, s2)
 
     return fid_value
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path', type=str, nargs=2,
+                        help='Path to the generated images or '
+                             'to .npz statistic files')
+    parser.add_argument('--batch-size', type=int, default=50,
+                        help='Batch size to use')
+    parser.add_argument('--device', type=str, default='cpu',
+                        help='Device to run on')
+    parser.add_argument('--dims', type=int, default=2048,
+                        choices=list(InceptionV3.BLOCK_INDEX_BY_DIM.keys()),
+                        help='Dimensionality of Inception features to use')
+    parser.add_argument('--num-workers', type=int, default=1,
+                        help='Number of workers for dataloader')
+    args = parser.parse_args()
+
+    fid_value = calculate_fid_given_wsi_paths(args.path, args.batch_size,
+                                              args.device, args.dims,
+                                              args.num_workers)
+    print('FID: ', fid_value)
