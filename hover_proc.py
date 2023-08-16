@@ -39,7 +39,7 @@ if __name__=='__main__':
     doing_files = [] #force it to do all the files, remove if another run
     # is in progress
     skip_files = doing_files + done_files
-    number_to_do = 50
+    number_to_do = 10
     slide_list = list(wsi_folder.glob(filter_str))
     to_do = []
     masks = []
