@@ -1,8 +1,5 @@
-# demux
-Demux Staining
-conda activate pixman on office computer
+# Readme
 
-rigina location on office computer: /data-ssd/DemuxStain/staintools
-Results also available at: C:\Data\Mitosis_Ki67_IHC_and_IHC+HE_Trial_Asmaa
-Presentation
-C:\Users\fayya\OneDrive - University of Warwick\Demultiplexed Imaging for Mitosis.pptx
+Code for manipulating triple-stained images, restaining slides, and preparing datasets for stain transfer models.
+
+histogram-based restaining code partially based on Fayyaz' original code
