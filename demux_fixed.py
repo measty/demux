@@ -269,15 +269,21 @@ class VirtualRestainer:
         # self.stain_mat = np.array([[0.65, 0.70, 0.29],
         #                   [0.07, 0.99, 0.11],
         #                   [0.27, 0.57, 0.78]])     #sklearn
-        self.stain_mat = np.array([[0.590, 0.73, 0.35],  #PHH3, Qupath
-                          [0.19, 0.9, 0.41],
-                          [0.5, 0.615, 0.6]])
+        # self.stain_mat = np.array([[0.590, 0.73, 0.35],  #PHH3, Qupath
+        #                   [0.19, 0.9, 0.41],
+        #                   [0.5, 0.615, 0.6]])
         # self.stain_mat = np.array([[0.5207, 0.7412, 0.3322],
         #                     [0.1816, 0.9181, 0.4228],
         #                     [0.2083, 0.5305, 0.8307]])  #PHH3 stain learner
+        self.stain_mat = np.array([[0.65, 0.70, 0.29],
+                           [0.19, 0.9, 0.41],
+                           [0.27, 0.57, 0.78]])    # hybrid, E from Qpath, HD from 'ideal'
+        # self.stain_mat = np.array([[0.358, 0.928, 0.105],
+        #                      [0.295, 0.95, 0.101],
+        #                      [0.524, 0.708, 0.474]])  #Fouzia Qpath
         # self.stain_mat = np.array([[0.65, 0.70, 0.29],
-        #                    [0.17, 0.9, 0.23],
-        #                    [0.27, 0.57, 0.78]])    # hybrid, E from Qpath, HD from 'ideal'
+        #                   [0.295, 0.95, 0.101],
+        #                   [0.27, 0.57, 0.78]])     #fouzia hybrid
         
         self.stain_mat_inv = np.linalg.inv(self.stain_mat)
         if load_path is not None:
@@ -410,7 +416,7 @@ class VirtualRestainer:
     def __call__(self, tile):
         return self.restain_tile(tile, stains=self.stains, sigma=5, naive=False)
 
-    def restain_tile(self, tile, sigma=5.0, stains='HE', lum_norm=False, naive=False):
+    def restain_tile(self, tile, sigma=5.0, stains='HE', lum_norm=False, naive=False, return_hed=False):
         """Restain a tile of the input image. The tile is transformed into HED space and
         the unwanted stain is removed, adjusting the remaining stains according to the 
         coupling coeffs and histogram matchers.
@@ -449,21 +455,22 @@ class VirtualRestainer:
         if not naive:
             # in naive method, set all couplings to zero. We just throw away the stain 
             # we dont want and reconstruct the rgb, so below not needed     
-            h = rescale_intensity(h0, out_range=(0, 1),
-                                in_range=self.hrange)
-            e = rescale_intensity(e0, out_range=(0, 1),
-                                in_range=self.erange)
-            d = rescale_intensity(d0, out_range=(0, 1),
-                                in_range=self.drange)
 
             if sigma>0:
-                h1 = gaussian_filter(h0, sigma=sigma)[tissue_mask]
-                e1 = gaussian_filter(e0, sigma=sigma)[tissue_mask]
-                d1 = gaussian_filter(d0, sigma=sigma)[tissue_mask]
+                h1 = gaussian_filter(h0, sigma=sigma)
+                e1 = gaussian_filter(e0, sigma=sigma)
+                d1 = gaussian_filter(d0, sigma=sigma)
             else:
-                h1=h[tissue_mask]
-                e1=e[tissue_mask]
-                d1=d[tissue_mask]
+                h1=h0
+                e1=e0
+                d1=d0
+
+            h1 = rescale_intensity(h1, out_range=(0, 1),
+                                in_range=self.hrange)[tissue_mask]
+            e1 = rescale_intensity(e1, out_range=(0, 1),
+                                in_range=self.erange)[tissue_mask]
+            d1 = rescale_intensity(d1, out_range=(0, 1),
+                                in_range=self.drange)[tissue_mask]
 
         d0 = d0[tissue_mask]
         h0 = h0[tissue_mask]
@@ -536,6 +543,25 @@ class VirtualRestainer:
         
         #rec = (rec*255).astype('uint8')
         tile[tissue_mask,:] = rec
+        if 'D' in stains:
+            tile[~tissue_mask,:] = 245
+        if return_hed:
+            if stains == 'HE':
+                h_out = np.zeros((tile.shape[0], tile.shape[1]))
+                h_out[tissue_mask] = hrec
+                e_out = np.zeros((tile.shape[0], tile.shape[1]))
+                e_out[tissue_mask] = erec
+                return tile, h_out, e_out, blank
+            elif stains == 'HD':
+                h_out = np.zeros((tile.shape[0], tile.shape[1]))
+                h_out[tissue_mask] = hrec
+                d_out = np.zeros((tile.shape[0], tile.shape[1]))
+                d_out[tissue_mask] = drec
+                return tile, h_out, blank, d_out
+            elif stains == 'D':
+                d_out = np.zeros((tile.shape[0], tile.shape[1]))
+                d_out[tissue_mask] = drec
+                return tile, blank, blank, d_out
         return tile
 
     def save_info(self, filename):
@@ -588,7 +614,7 @@ class VirtualRestainer:
                 x, y = locs[i]
                 if y+rec.shape[0] > canvas_shape[0] or x+rec.shape[1] > canvas_shape[1]:
                     print("meep")
-                cum_canvas[y:y + self.patch_size, x:x + self.patch_size, :] = rec
+                cum_canvas[y:y + rec.shape[0], x:x + rec.shape[1], :] = rec
 
             # make a vips image and save it as a pyramidal tiff
             #height, width, bands = cum_canvas.shape
@@ -607,7 +633,7 @@ class VirtualRestainer:
             del cum_canvas
             os.remove(tmp_path)
 
-    def save_sample_tiles(self, save_path, tile_size=None, n_tiles=10, sigma=5.0, stains=['HE'], lum_norm=False):
+    def save_sample_tiles(self, save_path, tile_size=None, n_tiles=10, sigma=5.0, stains=['HE'], lum_norm=False, save_d=False, sep_folders=False):
         """Restain a random sampling of restained tiles, and save them as .png files."""
         if tile_size is not None:
             self.patch_size = tile_size
@@ -623,29 +649,41 @@ class VirtualRestainer:
 
         save_path = Path(save_path)
         save_path.mkdir(exist_ok=True)
+        if sep_folders:
+            for stain in stains:
+                (save_path / sep_folders[stain]).mkdir(exist_ok=True, parents=True)
         sample_inds = np.random.choice(len(self.patch_extractor), n_tiles, replace=False)
-        for ind in tqdm(sample_inds):
+        for i, ind in tqdm(enumerate(sample_inds)):
             tile = self.patch_extractor[int(ind)]
             for stain in stains:
+                if save_d and stain == 'HD':
+                    rec, _, _, d = self.restain_tile(tile, sigma=sigma, stains=stain, lum_norm=lum_norm, return_hed=True)
+                    rec = Image.fromarray(rec)
+                    rec.save(save_path / f"{self.img.stem}_{i}_{stain}.png")
+                    d = Image.fromarray((d * 255).astype(np.uint8))
+                    d.save(save_path / f"{self.img.stem}_{i}_Dchan.png")
                 rec = self.restain_tile(tile, sigma=sigma, stains=stain, lum_norm=lum_norm)
                 rec = Image.fromarray(rec)
-                rec.save(save_path / f"{ind}_{stain}.png")
+                if sep_folders:
+                    rec.save(save_path / sep_folders[stain] / f"{self.img.stem}_{i}.png")
+                else:
+                    rec.save(save_path / f"{self.img.stem}_{i}_{stain}.png")
             
 
 
 
 
 if __name__ == '__main__':
-    slides_path = Path(r"/media/u2071810/Data/Multiplexstaining/Asmaa Multiplex Staining")
+    slides_path = Path(r"/media/u2071810/Data1/Multiplexstaining/Asmaa_Multiplex_Staining")
     slides = list(slides_path.glob('*PHH3_HE.svs'))
-    for slide in slides[:5]:
-        if "only" in slide.stem or (slide.parent / (slide.stem + '_info_qpath.pkl')).exists():
+    for slide in slides[:10]:
+        if "only" in slide.stem or (slide.parent / (slide.stem + '_info_hybrid.pkl')).exists():
             continue
         try:
             restainer = VirtualRestainer(slide)
             #restainer.get_stain_matrix(n_jobs=1)
             restainer.get_histogram_matchers(n_jobs=4)
-            restainer.save_info(slide.parent / (slide.stem + '_info_qpath.pkl'))
+            restainer.save_info(slide.parent / (slide.stem + '_info_hybrid.pkl'))
         except:
             print(f"Failed to restain {slide.stem}")
             continue
