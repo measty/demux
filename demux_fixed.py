@@ -4,8 +4,6 @@ from sklearn.decomposition import DictionaryLearning
 from tiatoolbox.utils.misc import contrast_enhancer
 from scipy import linalg
 from joblib import Parallel, delayed
-from stainseparator import combine_stains, separate_stains
-from some_staintools import LuminosityStandardizer
 from tqdm import tqdm
 from scipy.ndimage import gaussian_filter
 from skimage.exposure import rescale_intensity
@@ -19,6 +17,46 @@ import os
 # os.environ['PATH'] = vipshome + ';' + os.environ['PATH']
 import pyvips as vips
 from PIL import Image
+
+def is_image(I):
+    """
+    Is I an image.
+    """
+    if not isinstance(I, np.ndarray):
+        return False
+    if not I.ndim == 3:
+        return False
+    return True
+
+def is_uint8_image(I):
+    """
+    Is I a uint8 image.
+    """
+    if not is_image(I):
+        return False
+    if I.dtype != np.uint8:
+        return False
+    return True
+
+class LuminosityStandardizer(object):
+
+    @staticmethod
+    def standardize(I, percentile=95):
+        """
+        Transform image I to standard brightness.
+        Modifies the luminosity channel such that a fixed percentile is saturated.
+
+        :param I: Image uint8 RGB.
+        :param percentile: Percentile for luminosity saturation. At least (100 - percentile)% of pixels should be fully luminous (white).
+        :return: Image uint8 RGB with standardized brightness.
+        """
+        assert is_uint8_image(I), "Image should be RGB uint8."
+        I_LAB = cv.cvtColor(I, cv.COLOR_RGB2LAB)
+        L_float = I_LAB[:, :, 0].astype(float)
+        p = np.percentile(L_float, percentile)
+        I_LAB[:, :, 0] = np.clip(255 * L_float / p, 0, 255).astype(np.uint8)
+        I = cv.cvtColor(I_LAB, cv.COLOR_LAB2RGB)
+        return I
 
 def get_luminosity_tissue_mask(img, threshold):
     """Get tissue mask based on the luminosity of the input image.
