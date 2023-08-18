@@ -11,14 +11,14 @@ from shutil import rmtree
 import pickle
 
 #wsi_folder = Path(r"/media/u2071810/Data/Multiplexstaining/Asmaa Multiplex Staining/")
-wsi_folder = Path(r"/media/u2071810/Data/Multiplexstaining/Asmaa Multiplex Staining/tiles_qpath")
+wsi_folder = Path(r"E:\PRISMATIC\tiles_hybrid2")
 mask_folder = None #Path(r"/media/u2071810/Data/ABCTB/histoqc_output_may_2022")
 #save_dir = Path(r"/home/u2071810/Data/Demux/overlays/")
 save_dir = wsi_folder
 tmp_save_dir = str(save_dir / "tmp")
 doing_now = save_dir / "current_files.pkl"
 #filter_str = '*restained6_HE.tiff'
-filter_str = '*.png'
+filter_str = '*HE.png'
 mode = 'tile' # 'wsi' or 'tile'
 
 if __name__=='__main__':
@@ -67,11 +67,17 @@ if __name__=='__main__':
         pretrained_model="hovernet_fast-pannuke",
         num_loader_workers=6,
         num_postproc_workers=12,
-        batch_size=48,
+        batch_size=16,
         auto_generate_mask=True,
         verbose=False,
     )
-    inst_segmentor.ioconfig.tile_shape = (4000, 4000)
+    #inst_segmentor.ioconfig.tile_shape = (4000, 4000)
+    unit = 'baseline'
+    res = 1.0
+    inst_segmentor.ioconfig.input_resolutions = [{'units': unit, 'resolution': res}]
+    inst_segmentor.ioconfig.output_resolutions = [{'units': unit, 'resolution': res}, {'units': unit, 'resolution': res}, {'units': unit, 'resolution': res}]
+    inst_segmentor.ioconfig.save_resolution = {'units': unit, 'resolution': res}
+    inst_segmentor.ioconfig.highest_input_resolution = {'units': unit, 'resolution': res}
 
     print(f'processing: {to_do}')
 
@@ -95,8 +101,11 @@ if __name__=='__main__':
         res_path = Path(save_dir) / f'{slide_path.stem}.db'
         try:
             #put the annotations in a store
-            mpp = WSIReader.open(slide_path).info.mpp
-            SQ = store_from_dat(Path(tmp_save_dir) / "0.dat", scale_factor=0.25/mpp)
+            if mode == 'wsi':
+                mpp = WSIReader.open(slide_path).info.mpp
+                SQ = store_from_dat(Path(tmp_save_dir) / "0.dat", scale_factor=0.25/mpp)
+            else:
+                SQ = store_from_dat(Path(tmp_save_dir) / "0.dat")
             SQ.dump(res_path)
         except:
             print(f'failed to process: {slide_path}')
