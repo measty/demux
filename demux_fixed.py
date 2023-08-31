@@ -51,11 +51,11 @@ class LuminosityStandardizer(object):
         :return: Image uint8 RGB with standardized brightness.
         """
         assert is_uint8_image(I), "Image should be RGB uint8."
-        I_LAB = cv.cvtColor(I, cv.COLOR_RGB2LAB)
+        I_LAB = cv2.cvtColor(I, cv2.COLOR_RGB2LAB)
         L_float = I_LAB[:, :, 0].astype(float)
         p = np.percentile(L_float, percentile)
         I_LAB[:, :, 0] = np.clip(255 * L_float / p, 0, 255).astype(np.uint8)
-        I = cv.cvtColor(I_LAB, cv.COLOR_LAB2RGB)
+        I = cv2.cvtColor(I_LAB, cv2.COLOR_LAB2RGB)
         return I
 
 def get_luminosity_tissue_mask(img, threshold):

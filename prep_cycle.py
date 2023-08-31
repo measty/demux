@@ -5,6 +5,7 @@ from tiatoolbox.wsicore import WSIReader
 import numpy as np
 from tqdm import tqdm
 from PIL import Image
+import argparse
 
 slide_path = Path(r"/media/u2071810/Data1/Multiplexstaining/Asmaa_Multiplex_Staining")
 tile_path = Path(r"/media/u2071810/Data1/Multiplexstaining/Asmaa_Multiplex_Staining/tiles_cycle_lores")
@@ -124,4 +125,13 @@ def from_restained():
     print("Done")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    #add args for pathA, pathB and savepath
+    parser.add_argument("--mode", type=str, default="tile", help="tile or wsi")
+    parser.add_argument("--patch_size", type=int, default=256, help="patch size")
+    parser.add_argument("--n_tiles", type=int, default=1000, help="number of tiles")
+    parser.add_argument("--stains", type=str, default="HED", help="stains to use")
+    parser.add_argument("--slide_path", type=str, default="/home/alexanderliao/data/PHH3", help="path to slides")
+    parser.add_argument("--tile_path", type=str, default="/home/alexanderliao/data/PHH3/tiles", help="path to save tiles")
+    
     from_restained()
