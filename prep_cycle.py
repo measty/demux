@@ -131,7 +131,7 @@ if __name__ == "__main__":
     parser.add_argument("--patch_size", type=int, default=256, help="patch size")
     parser.add_argument("--n_tiles", type=int, default=1000, help="number of tiles")
     parser.add_argument("--stains", type=str, default="HED", help="stains to use")
-    parser.add_argument("--slide_path", type=str, default="/home/alexanderliao/data/PHH3", help="path to slides")
-    parser.add_argument("--tile_path", type=str, default="/home/alexanderliao/data/PHH3/tiles", help="path to save tiles")
-    
+    parser.add_argument("--slide_path", type=str, default="E:\PRISMATIC\Asmaa_Multiplex_Staining", help="path to slides")
+    parser.add_argument("--tile_path", type=str, default="E:\PRISMATIC\cycle_tiles", help="path to save tiles")
+
     from_restained()
