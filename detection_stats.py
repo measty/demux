@@ -60,7 +60,7 @@ if __name__ == "__main__":
     parser.add_argument("--stride", type=int, help="Stride")
 
     args = parser.parse_args()
-    store_path = args.input
+    store_path = Path(args.input)
     save_dir = Path(args.save_dir)
     n_tiles = args.n_tiles
     patch_size = args.patch_size
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     df = pd.DataFrame(type_counts)
     df['n_cells'] = n_cells
     df['area_hist'] = area_hist
-    df.to_csv(save_dir / "cell_stats.csv")
+    df.to_csv(save_dir / f"{input.stem}_cell_stats.csv")
 
 
 
