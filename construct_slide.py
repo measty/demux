@@ -151,14 +151,14 @@ if __name__ == "__main__":
     slide_path = Path(
         r"/media/u2071810/Data/Multiplexstaining/Asmaa_Multiplex_Staining"
     )
-    save_path = Path(r"/media/u2071810/Data/Multiplexstaining/demux_restains")
+    save_path = Path(r"/home/u2071810/Data/Demux/demux_restains")
     filter = "*PHH3_HE.svs"
     slides = list(slide_path.glob(filter))
     stains = ["HE", "HD"]
     mode = "wsi"
     slides_keep = []
     for slide in slides:
-        info_path = slide.parent / (slide.stem + "_info2.pkl")
+        info_path = slide.parent / (slide.stem + "_info.pkl")
         if info_path.exists():
             slides_keep.append(slide)
     slides = slides_keep
@@ -168,14 +168,14 @@ if __name__ == "__main__":
         restainer = VirtualRestainer(
             slide, coupling_coeffs={"wdh": 0.8, "wde": 0.1, "weh": 0.1, "wed": 0.1}
         )
-        info_path = slide.parent / (slide.stem + "_info_hybrid.pkl")
+        info_path = slide.parent / (slide.stem + "_info.pkl")
         try:
             restainer.load_info(info_path)
         except:
             print("No info file found")
             continue
         if mode == "wsi":
-            if not (save_path / (slide.stem + "_restained2_HE.tiff")).exists():
+            if not (save_path / (slide.stem + "_restained_HE.tiff")).exists():
                 construct_slide(
                     slide,
                     "otsu",
@@ -183,7 +183,7 @@ if __name__ == "__main__":
                     proc_fn=restainer,
                     resolution=0,
                     stride=2048,
-                    save_path=save_path / (slide.stem + "_restained2_HE.tiff"),
+                    save_path=save_path / (slide.stem + "_restained_HE.tiff"),
                 )
 
     # if "*" in slide_path.name:

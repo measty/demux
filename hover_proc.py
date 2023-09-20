@@ -9,21 +9,34 @@ import os
 from pathlib import Path
 from shutil import rmtree
 import pickle
+import argparse
 
-#wsi_folder = Path(r"/media/u2071810/Data/Multiplexstaining/Asmaa Multiplex Staining/")
-wsi_folder = Path(r"E:\PRISMATIC\tiles_hybrid2")
-mask_folder = None #Path(r"/media/u2071810/Data/ABCTB/histoqc_output_may_2022")
-#save_dir = Path(r"/home/u2071810/Data/Demux/overlays/")
-save_dir = wsi_folder
-tmp_save_dir = str(save_dir / "tmp")
-doing_now = save_dir / "current_files.pkl"
-#filter_str = '*restained6_HE.tiff'
-filter_str = '*HE.png'
-mode = 'tile' # 'wsi' or 'tile'
 
 if __name__=='__main__':
+
+
+    parser = argparse.ArgumentParser(description='Process input arguments.')
+    parser.add_argument('--wsi_folder', type=Path, required=True, help='Path to folder containing WSI files.')
+    parser.add_argument('--mask_folder', type=Path, help='Path to folder containing mask files.')
+    parser.add_argument('--save_dir', type=Path, required=True, help='Path to folder where output files will be saved.')
+    parser.add_argument('--filter_str', type=str, default='*HE.png', help='Filter string for selecting input files.')
+    parser.add_argument('--mode', type=str, default='tile', choices=['wsi', 'tile'], help='Processing mode (wsi or tile).')
+    parser.add_argument('--names', type=str, nargs='+', help='List of slide names from the filtered list to process.')
+                        
+
+    args = parser.parse_args()
+
+    wsi_folder = Path(args.wsi_folder)
+    mask_folder = Path(args.mask_folder) if args.mask_folder else None
+    save_dir = Path(args.save_dir)
+    filter_str = args.filter_str
+    mode = args.mode
+    names = args.names if args.names else None
+
+    doing_now = save_dir / "current_files.pkl"
     if not save_dir.exists():
         save_dir.mkdir()
+    tmp_save_dir = str(save_dir / "tmp")
 
     done_files = save_dir.glob('*.dat')
     done_files = [f.stem for f in done_files]
@@ -41,6 +54,11 @@ if __name__=='__main__':
     skip_files = doing_files + done_files
     number_to_do = 10
     slide_list = list(wsi_folder.glob(filter_str))
+    if names:
+        named_files = []
+        for name in names:
+            named_files.extend([f for f in slide_list if name in f.stem])
+        slide_list = named_files
     to_do = []
     masks = []
     #get the masks
@@ -71,13 +89,15 @@ if __name__=='__main__':
         auto_generate_mask=True,
         verbose=False,
     )
-    #inst_segmentor.ioconfig.tile_shape = (4000, 4000)
-    unit = 'baseline'
-    res = 1.0
-    inst_segmentor.ioconfig.input_resolutions = [{'units': unit, 'resolution': res}]
-    inst_segmentor.ioconfig.output_resolutions = [{'units': unit, 'resolution': res}, {'units': unit, 'resolution': res}, {'units': unit, 'resolution': res}]
-    inst_segmentor.ioconfig.save_resolution = {'units': unit, 'resolution': res}
-    inst_segmentor.ioconfig.highest_input_resolution = {'units': unit, 'resolution': res}
+    if mode == 'wsi':
+        inst_segmentor.ioconfig.tile_shape = (4000, 4000)
+    else:
+        unit = 'baseline'
+        res = 1.0
+        inst_segmentor.ioconfig.input_resolutions = [{'units': unit, 'resolution': res}]
+        inst_segmentor.ioconfig.output_resolutions = [{'units': unit, 'resolution': res}, {'units': unit, 'resolution': res}, {'units': unit, 'resolution': res}]
+        inst_segmentor.ioconfig.save_resolution = {'units': unit, 'resolution': res}
+        inst_segmentor.ioconfig.highest_input_resolution = {'units': unit, 'resolution': res}
 
     print(f'processing: {to_do}')
 
