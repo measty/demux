@@ -14,9 +14,9 @@ def get_cell_stats_box(store: SQLiteStore, box: tuple[int, int, int, int], types
     """Queries store for cells in box and returns stats"""
     cells = store.query(geometry=box)
     # each cell has a properties dict, make a dataframe of all the properties
-    df = pd.DataFrame([c.properties for c in cells])
+    df = pd.DataFrame([c.properties for c in cells.values()])
     # get the area of each cells shapely geometry (cell.geometry.area)
-    areas = [c.geometry.area for c in cells]
+    areas = [c.geometry.area for c in cells.values()]
     df['area'] = areas
     # get the number of cells
     n_cells = len(df)
@@ -24,7 +24,7 @@ def get_cell_stats_box(store: SQLiteStore, box: tuple[int, int, int, int], types
     type_counts = df['type'].value_counts().reindex(types, fill_value=0)
 
     # histogram of distribution of areas
-    bins = np.hstack(([0], np.linspace(50, 500, 50), [1000]))
+    bins = np.linspace(0, 2000, 200) # np.hstack(([0], np.linspace(0, 2000, 200)))
     area_hist, _ = np.histogram(df['area'], bins=bins)
 
     return n_cells, type_counts, area_hist, bins
@@ -61,11 +61,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     store_path = args.input
-    save_dir = args.save_dir
+    save_dir = Path(args.save_dir)
     n_tiles = args.n_tiles
     patch_size = args.patch_size
     stride = args.stride if args.stride is not None else patch_size
     wsi = args.wsi if args.wsi is not None else None
+    types = [0, 1, 2, 3, 4]
 
     if not Path(store_path).is_dir() and wsi:
         # in wsi mode with a single store for the wsi
@@ -74,7 +75,8 @@ if __name__ == "__main__":
         slide_dims = reader.info.slide_dimensions[::-1]
         # get global stats on whole slide
         store = SQLiteStore(store_path)
-        global_n_cells, global_type_counts, global_area_hist, global_area_bins = get_cell_stats_box(store, (0, 0, slide_dims[0], slide_dims[1]))
+        global_n_cells, global_type_counts, global_area_hist, global_area_bins = get_cell_stats_box(store, (0, 0, slide_dims[0], slide_dims[1]), types)
+        print(f"Global stats: {global_n_cells} cells, {global_type_counts} type counts, {global_area_hist} area hist")
         patches = get_random_patch_locations(wsi, n_tiles, patch_size, stride)
     elif Path(store_path).is_dir():
         # in tile mode with a folder of stores
@@ -87,10 +89,10 @@ if __name__ == "__main__":
     # get stats on random patches
     for i, box in tqdm(enumerate(patches)):
         if mode == "wsi":
-            n, tc, ah, _ = get_cell_stats_box(store, box)
+            n, tc, ah, _ = get_cell_stats_box(store, box, types)
         else:
             store = SQLiteStore(stores[i])
-            n, tc, ah, _ = get_cell_stats_box(store, box)
+            n, tc, ah, _ = get_cell_stats_box(store, box, types)
         n_cells.append(n)
         type_counts.append(tc)
         area_hist.append(ah)
