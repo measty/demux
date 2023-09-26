@@ -6,58 +6,47 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process input arguments.')
-    parser.add_argument('--csv1', type=str, required=True, help='Path to first csv file.')
-    parser.add_argument('--csv2', type=str, required=True, help='Path to second csv file.')
-    parser.add_argument('--n_types', type=int, default=4, help='Number of cell types.')
+    parser.add_argument('--csv1', type=str, help='Path to first csv file.', default=r"E:\PRISMATIC\demux_restained\81RKRK_HE_cell_stats.csv") 
+    parser.add_argument('--csv2', type=str, help='Path to second csv file.', default=r"E:\PRISMATIC\demux_restained\81RKRK_PHH3_HE_restained_HE_cell_stats.csv")
+    parser.add_argument('--n_types', type=int, default=5, help='Number of cell types.')
     parser.add_argument('--save_dir', type=str, help='Optional path to save figures in.')
 
     args = parser.parse_args()
     df1 = pd.read_csv(args.csv1)
     df2 = pd.read_csv(args.csv2)
+    # drop 'Unnamed: 0' column
+    df1 = df1.drop(columns=['Unnamed: 0'])
+    df2 = df2.drop(columns=['Unnamed: 0'])
 
     # each row of df is stats of cell detections from a single patch
     # columns are cell type counts, n_cells, and area_hist in some number of bins
     # make plots to illustrate differences in distributions of these stats
 
     # cell type counts
-    # get the mean and std of each cell type count across patches
+    # plot box and whisker plots of cell type counts with shared y axis
     n_types = args.n_types
     df1_type_counts = df1.iloc[:, :n_types]
     df2_type_counts = df2.iloc[:, :n_types]
-    df1_type_counts_mean = df1_type_counts.mean(axis=0)
-    df1_type_counts_std = df1_type_counts.std(axis=0)
-    df2_type_counts_mean = df2_type_counts.mean(axis=0)
-    df2_type_counts_std = df2_type_counts.std(axis=0)
-
-    # plot the mean and std of each cell type count
-    fig, ax = plt.subplots()
-    ax.bar(np.arange(len(df1_type_counts_mean)), df1_type_counts_mean, yerr=df1_type_counts_std, label='csv1')
-    ax.bar(np.arange(len(df2_type_counts_mean)), df2_type_counts_mean, yerr=df2_type_counts_std, label='csv2')
-    ax.set_xticks(np.arange(len(df1_type_counts_mean)))
-    ax.set_xticklabels(df1_type_counts.columns)
-    ax.set_ylabel('Mean cell type count')
-    ax.set_xlabel('Cell type')
-    ax.legend()
+    fig, ax = plt.subplots(1, 2, sharey=True)
+    ax[0].boxplot(df1_type_counts)
+    ax[0].set_ylabel('Number of cells')
+    ax[0].set_title('Real HE')
+    ax[1].boxplot(df2_type_counts)
+    ax[1].set_ylabel('Number of cells')
+    ax[1].set_title('Restained HE')
     plt.show()
 
-    # n_cells
-    # get the mean and std of n_cells across patches
+
+    
+
+    # box and whisker plonts on cell nums
     df1_n_cells = df1.iloc[:, n_types]
     df2_n_cells = df2.iloc[:, n_types]
-    df1_n_cells_mean = df1_n_cells.mean(axis=0)
-    df1_n_cells_std = df1_n_cells.std(axis=0)
-    df2_n_cells_mean = df2_n_cells.mean(axis=0)
-    df2_n_cells_std = df2_n_cells.std(axis=0)
-
-    # plot the mean and std of n_cells
-    fig, ax = plt.subplots()
-    ax.bar(np.arange(len(df1_n_cells_mean)), df1_n_cells_mean, yerr=df1_n_cells_std, label='csv1')
-    ax.bar(np.arange(len(df2_n_cells_mean)), df2_n_cells_mean, yerr=df2_n_cells_std, label='csv2')
-    ax.set_xticks(np.arange(len(df1_n_cells_mean)))
-    ax.set_xticklabels(['n_cells'])
-    ax.set_ylabel('Mean n_cells')
-    ax.set_xlabel('Cell type')
-    ax.legend()
+    fig, ax = plt.subplots(1, 2)
+    ax[0].boxplot(df1_n_cells)
+    ax[0].set_ylabel('Number of cells')
+    ax[1].boxplot(df2_n_cells)
+    ax[1].set_ylabel('Number of cells')
     plt.show()
 
     # area_hist - how should we illustrate diffences in distributions?

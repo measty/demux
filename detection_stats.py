@@ -24,7 +24,7 @@ def get_cell_stats_box(store: SQLiteStore, box: tuple[int, int, int, int], types
     type_counts = df['type'].value_counts().reindex(types, fill_value=0)
 
     # histogram of distribution of areas
-    bins = np.linspace(0, 2000, 200) # np.hstack(([0], np.linspace(0, 2000, 200)))
+    bins = np.linspace(0, 2000, 20) # np.hstack(([0], np.linspace(0, 2000, 200)))
     area_hist, _ = np.histogram(df['area'], bins=bins)
 
     return n_cells, type_counts, area_hist, bins
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     df = pd.DataFrame(type_counts)
     df['n_cells'] = n_cells
     df['area_hist'] = area_hist
-    df.to_csv(save_dir / f"{input.stem}_cell_stats.csv")
+    df.to_csv(save_dir / f"{store_path.stem}_cell_stats.csv")
 
 
 
